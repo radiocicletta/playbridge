@@ -1,0 +1,46 @@
+#!/usr/bin/env python
+
+from PySide import QtCore, QtGui
+
+class MainWin(QtGui.QWidget):
+
+    def __init__(self, parent=None):
+        super(MainWin, self).__init__(parent)
+
+
+        self.createGrid()
+        self.resize(480, 320)
+
+    def createGrid(self):
+        grid = QtGui.QGridLayout()
+        grid.addWidget(self.createOnAirButtons(), 0, 0)
+        self.setLayout(grid)
+
+
+    def createOnAirButtons(self):
+        groupBox = QtGui.QGroupBox("Controllo Diretta")
+        groupBox.setFlat(True)
+
+        vbox = QtGui.QVBoxLayout()
+
+        btnOnAir = QtGui.QPushButton("&Entra in Diretta")
+        btnOnAir.setCheckable(True)
+        btnSwitch = QtGui.QPushButton("&Cambio Programma")
+
+        vbox.addWidget(btnOnAir)
+        vbox.addWidget(btnSwitch)
+        vbox.addStretch(1)
+
+        groupBox.setLayout(vbox)
+        return groupBox
+
+
+
+if __name__ == '__main__':
+
+    import sys
+
+    app = QtGui.QApplication(sys.argv)
+    mainWin = MainWin()
+    mainWin.show()
+    sys.exit(app.exec_())
