@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from PySide import QtCore, QtGui
+from subprocess import Popen
 
 class MainWin(QtGui.QWidget):
 
@@ -8,14 +9,27 @@ class MainWin(QtGui.QWidget):
         super(MainWin, self).__init__(parent)
 
 
+        self.live = False
         self.createGrid()
         self.resize(480, 320)
+        self.recorderpid = 0
 
     def createGrid(self):
         grid = QtGui.QGridLayout()
-        grid.addWidget(self.createOnAirButtons(), 0, 0)
+        grid.addWidget(self.createClock(), 0, 0)
+        grid.addWidget(self.createOnAirButtons(), 1, 0)
+        grid.addWidget(self.createTimer(), 2, 0)
         self.setLayout(grid)
 
+    def createClock(self):
+        clock = DigitalClock()
+        clock.setMinimumHeight(200)
+        return clock
+
+    def createTimer(self, fire=30):
+        timer = DigitalTimer(fire)
+        timer.setMinimumHeight(100)
+        return timer
 
     def createOnAirButtons(self):
         groupBox = QtGui.QGroupBox("Controllo Diretta")
@@ -23,9 +37,14 @@ class MainWin(QtGui.QWidget):
 
         vbox = QtGui.QVBoxLayout()
 
-        btnOnAir = QtGui.QPushButton("&Entra in Diretta")
+        btnOnAir = QtGui.QPushButton("&On Air")
         btnOnAir.setCheckable(True)
-        btnSwitch = QtGui.QPushButton("&Cambio Programma")
+        btnOnAir.clicked.connect(self.onair)
+
+        btnSwitch = QtGui.QPushButton("Termine e &Cambio Programma")
+        btnSwitch.clicked.connect(self.switch)
+
+        btnOnAir.setMinimumHeight(50)
 
         vbox.addWidget(btnOnAir)
         vbox.addWidget(btnSwitch)
@@ -34,6 +53,96 @@ class MainWin(QtGui.QWidget):
         groupBox.setLayout(vbox)
         return groupBox
 
+    def onair(self):
+        self.live = not self.live
+
+    def switch(self):
+        if self.live: # and self.recorderpid:
+            print "OK"
+
+    def askExit(self):
+        if self.live:
+            ret = QtGui.QMessageBox.warning(self, "Application",
+                    "Siamo in diretta, uscire dal programma? ",
+                    QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
+            if ret == QtGui.QMessageBox.Yes:
+                return True
+            elif ret == QtGui.QMessageBox.No:
+                return False
+        return True
+
+    def closeEvent(self, event):
+        if self.askExit():
+            event.accept()
+        else:
+            event.ignore()
+
+
+class DigitalClock(QtGui.QLCDNumber):
+    def __init__(self, parent=None):
+        super(DigitalClock, self).__init__(parent)
+
+        self.setSegmentStyle(QtGui.QLCDNumber.Filled)
+        self.setFrameStyle(QtGui.QLCDNumber.NoFrame)
+        self.setStyleSheet("color: #444");
+
+        timer = QtCore.QTimer(self)
+        timer.timeout.connect(self.showTime)
+        timer.start(1000)
+
+        self.showTime()
+
+    def showTime(self):
+        time = QtCore.QTime.currentTime()
+        text = time.toString('hh:mm')
+        if (time.second() % 2) == 0:
+            text = text[:2] + ' ' + text[3:]
+
+        self.display(text)
+
+
+class DigitalTimer(QtGui.QLCDNumber):
+    def __init__(self, end, parent=None):
+        super(DigitalTimer, self).__init__(parent)
+        self.start = QtCore.QTime().currentTime()
+        self.stop = (QtCore.QTime().currentTime()).addSecs(end)
+        appear = int((end - (end * 0.11)) * 1000)
+        print self.start.toString('hh:mm')
+        print self.stop.toString('hh:mm')
+        print end, (end - (end * 0.11))
+
+        self.setSegmentStyle(QtGui.QLCDNumber.Filled)
+        self.setFrameStyle(QtGui.QLCDNumber.NoFrame)
+        self.setStyleSheet("color: #444");
+
+        timer = QtCore.QTimer(self)
+        timer.singleShot(appear, self.shot)
+        self.text = ""
+        self.display(self.text)
+
+    def showTime(self):
+        time = QtCore.QTime.currentTime()
+        left = time.secsTo(self.stop)
+        minutes = left / 60
+        seconds = left - (minutes * 60)
+
+        if minutes == 0 and seconds <= 30:
+            self.setStyleSheet("color: #f03303");
+
+        elif left < 0:
+            self.setStyleSheet("background-color: #f03303; color: white");
+
+        if self.text == '':
+            self.text = '{:02}:{:02}'.format(minutes, seconds)
+        else:
+            self.text = ''
+
+        self.display(self.text)
+
+    def shot(self):
+        timer = QtCore.QTimer(self)
+        timer.timeout.connect(self.showTime)
+        timer.start(500)
 
 
 if __name__ == '__main__':
