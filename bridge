@@ -2,8 +2,14 @@
 
 from PySide import QtCore, QtGui
 from subprocess import Popen
+from signal import SIGUSR1, SIGTERM
+import os
 
 class MainWin(QtGui.QWidget):
+
+    onair = 1  # live mode
+    auto = 2   # automatic mode
+    middletime = 3 # automatic mode between 2 shows
 
     def __init__(self, parent=None):
         super(MainWin, self).__init__(parent)
@@ -17,14 +23,24 @@ class MainWin(QtGui.QWidget):
     def createGrid(self):
         grid = QtGui.QGridLayout()
         grid.addWidget(self.createClock(), 0, 0)
-        grid.addWidget(self.createOnAirButtons(), 1, 0)
-        grid.addWidget(self.createTimer(), 2, 0)
+        grid.addWidget(self.createStatusLabel(), 1, 0)
+        grid.addWidget(self.createOnAirButtons(), 2, 0)
+        grid.addWidget(self.createTimer(), 3, 0)
         self.setLayout(grid)
 
     def createClock(self):
         clock = DigitalClock()
         clock.setMinimumHeight(200)
         return clock
+
+    def createStatusLabel(self):
+        self.lblStatus = QtGui.QLabel("Automatico")
+        self.lblStatus.setFont(
+            QtGui.QFont("sans-serif", 30, QtGui.QFont.Bold)
+        )
+        self.displayStatus(self.auto)
+        return self.lblStatus
+
 
     def createTimer(self, fire=30):
         timer = DigitalTimer(fire)
@@ -37,16 +53,19 @@ class MainWin(QtGui.QWidget):
 
         vbox = QtGui.QVBoxLayout()
 
-        btnOnAir = QtGui.QPushButton("&On Air")
-        btnOnAir.setCheckable(True)
-        btnOnAir.clicked.connect(self.onair)
+        self.btnOnAir = QtGui.QPushButton("&On Air")
+        self.btnOnAir.setCheckable(True)
+        self.btnOnAir.clicked.connect(self.onair)
+        self.btnOnAir.setFont(
+            QtGui.QFont("sans-serif", 20, QtGui.QFont.Bold)
+        )
 
         btnSwitch = QtGui.QPushButton("Termine e &Cambio Programma")
         btnSwitch.clicked.connect(self.switch)
 
-        btnOnAir.setMinimumHeight(50)
+        self.btnOnAir.setMinimumHeight(50)
 
-        vbox.addWidget(btnOnAir)
+        vbox.addWidget(self.btnOnAir)
         vbox.addWidget(btnSwitch)
         vbox.addStretch(1)
 
@@ -55,10 +74,33 @@ class MainWin(QtGui.QWidget):
 
     def onair(self):
         self.live = not self.live
+        if self.live:
+            # here we will use rotter
+            self.recorderpid = Popen("sleep 300".split()).pid
+            self.btnOnAir.setStyleSheet("color: #f03303")
+            self.displayStatus(self.onair)
+
+        elif self.recorderpid:
+            os.kill(self.recorderpid, SIGTERM)
+            self.recorderpid = 0
+            self.btnOnAir.setStyleSheet("")
+            self.displayStatus(self.auto)
 
     def switch(self):
-        if self.live: # and self.recorderpid:
-            print "OK"
+        if self.live and self.recorderpid:
+            os.kill(self.recorderpid, SIGUSR1)
+            self.displayStatus(self.middletime)
+
+    def displayStatus(self, status):
+        if status == self.onair:
+            self.lblStatus.setText("Diretta")
+            self.lblStatus.setStyleSheet("color: red")
+        elif status == self.auto:
+            self.lblStatus.setText("Automatico")
+            self.lblStatus.setStyleSheet("color: green")
+        elif status == self.middletime:
+            self.lblStatus.setText("Automatico - cambio")
+            self.lblStatus.setStyleSheet("color: orange")
 
     def askExit(self):
         if self.live:
